@@ -1,12 +1,19 @@
 package cn.tinyhai
 
 import cn.tinyhai.evaluation.Evaluation
+import cn.tinyhai.exception.AlreadyEvaluatingException
 import io.ktor.application.*
+import io.ktor.client.engine.callContext
+import io.ktor.features.ForwardedHeaderSupport
+import io.ktor.features.XForwardedHeaderSupport
+import io.ktor.features.origin
 import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.html.respondHtml
+import io.ktor.http.push
 import io.ktor.request.receiveParameters
 import io.ktor.util.KtorExperimentalAPI
+import io.ktor.util.pipeline.PipelinePhase
 import kotlinx.coroutines.withContext
 import kotlinx.html.*
 import java.lang.RuntimeException
@@ -24,10 +31,17 @@ fun Application.module(testing: Boolean = false) {
 //        }
 //    }
 
+//    install(ForwardedHeaderSupport)
+
     routing {
+        get("/") {
+            call.respondRedirect("/evaluation")
+            return@get
+        }
         route("/evaluation") {
             get {
                 val error = call.parameters["error"]
+                println("evaluation访问")
                 call.respondHtml {
                     head {
                         title("一键评教")
@@ -65,6 +79,7 @@ fun Application.module(testing: Boolean = false) {
 
                 var successCount = 0
                 var failCount = 0
+
                 try {
                     val all = withContext(coroutineContext) {
                         Evaluation.startEvaluation(username, password).also {
@@ -81,6 +96,8 @@ fun Application.module(testing: Boolean = false) {
                 } catch (e: RuntimeException) {
                     e.printStackTrace()
                     call.respondText("评教出错：${e.message}")
+                } catch (e: AlreadyEvaluatingException) {
+                    println("用户${e.message}正在评教")
                 }
             }
         }

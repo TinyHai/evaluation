@@ -1,6 +1,7 @@
 package cn.tinyhai.evaluation
 
 import cn.tinyhai.aes.AESUtils
+import cn.tinyhai.exception.AlreadyEvaluatingException
 import cn.tinyhai.parse.EduFormParser
 import cn.tinyhai.parse.VPNTokenParser
 import io.ktor.client.HttpClient
@@ -15,39 +16,127 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.*
 import io.ktor.util.KtorExperimentalAPI
 import io.ktor.util.toByteArray
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.lang.Exception
 import java.lang.RuntimeException
 import java.nio.charset.Charset
 
 @KtorExperimentalAPI
-class EvaluationHelper private constructor() {
-
+class EvaluationHelper private constructor(
+        private val username: String,
+        private val password: String
+) {
     private val cookieStore = HashSet<Cookie>()
 
-    private var loginClientUsed = false
-
-    private var evaluationClientUsed = false
-
-    private val loginClient by lazy {
-        loginClientUsed = true
+    private val loginClient = lazy {
         generateLoginClient()
     }
 
-    val evaluationClient by lazy {
-        evaluationClientUsed = true
+    private val evaluationClient = lazy {
         generateEvaluationClient(cookieStore)
     }
 
-    fun dispose() {
-        if (loginClientUsed) {
+    /**
+     * @return 携带Cookies的 HttpClient
+     * @throws RuntimeException 登陆出现任何异常都会抛出并携带异常原因
+     **/
+    suspend fun login(): HttpClient {
+        val client = loginClient.value
+
+        // 打开VPN页面获取随机Token
+        val vpnResponse = okOrThrow("VPN登陆页面打开失败") {
+            client.get(URL_VPN_LOGIN)
+        }
+
+        val tokenMap = VPNTokenParser.parse(vpnResponse.content.toByteArray().toString(Charsets.UTF_8))
+
+        // 登陆VPN
+        val vpnLoginParameters = generateVPNLoginParameters(username, password, tokenMap)
+        val vpnLoginResponse = foundOrThrow("VPN登陆失败") {
+            client.submitForm(vpnLoginParameters) {
+                url(URL_VPN_LOGIN)
+            }
+        }
+
+        // 获取必要的Cookies
+        val location = vpnLoginResponse.headers["Location"]!!
+        val vpnKeyResponse = foundOrThrow("VPN Key获取失败") {
+            client.get(location)
+        }
+
+        cookieStore.addAll(vpnKeyResponse.setCookie().filter { it.domain == ".ecit.cn" })
+
+        // 打开教务系统获取随机密钥
+        val eduResponse = okOrThrow("教务系统页面打开失败") {
+            client.get(URL_EDUCATIONAL_LOGIN)
+        }
+        val formMap = EduFormParser.parse(eduResponse.string())
+        val key = formMap.remove("key")!!
+        val eduLoginParameters = Parameters.build {
+            append("username", username)
+            append("password", AESUtils.encrypt(password, key))
+            formMap.forEach {
+                append(it.key, it.value)
+            }
+        }
+
+        // 登陆教务系统
+        val eduLoginResponse = foundOrThrow("教务系统登陆失败") {
+            client.submitForm(eduLoginParameters) {
+                url(URL_EDUCATIONAL_LOGIN)
+            }
+        }
+
+        var foundResponse = eduLoginResponse
+
+        // 获取必要的Cookies
+        foundResponse = client.get(foundResponse.headers["Location"]!!)
+        cookieStore.addAll(foundResponse.setCookie())
+
+        /*
+        * 跳转到 Constants.URL_EDUCATIONAL_HOME 为止
+        * 获取JSESSIONID Cookies
+        * */
+        while (foundResponse.status == HttpStatusCode.Found) {
+            foundResponse = client.get(foundResponse.headers["Location"]!!)
+        }
+
+        cookieStore.addAll(eduLoginResponse.setCookie())
+
+//      println(helper.getCookieStoreString())
+
+        return evaluationClient.value
+    }
+
+    private suspend fun logout() {
+        if (loginClient.isInitialized()) {
+            val client = loginClient.value
+            val response = client.get<HttpResponse>(URL_VPN_LOGOUT)
+            val cookies = response.setCookie()
+            if (cookies.isEmpty()) {
+                throw RuntimeException("VPN登出失败")
+            }
+            println(cookies.map { it.name to it.value })
+        }
+        throw RuntimeException("VPN未登陆，不需要登出")
+    }
+
+    suspend fun dispose() {
+        logout()
+
+        if (loginClient.isInitialized()) {
             try {
-                loginClient.close()
+                loginClient.value.close()
             } catch (e: Exception) {}
         }
-        if (evaluationClientUsed) {
+        if (evaluationClient.isInitialized()) {
             try {
-                evaluationClient.close()
+                evaluationClient.value.close()
             } catch (e: Exception) {}
+        }
+        recordMutex.withLock {
+            evaluationRecord.remove(username)
         }
     }
 
@@ -56,6 +145,10 @@ class EvaluationHelper private constructor() {
     }
 
     companion object {
+
+        private val evaluationRecord = ArrayList<String>()
+
+        private val recordMutex = Mutex()
 
         private fun generateLoginClient() =
             HttpClient(CIO) {
@@ -99,65 +192,13 @@ class EvaluationHelper private constructor() {
             }
 
         suspend fun obtain(username: String, password: String): EvaluationHelper {
-            val helper = EvaluationHelper()
-            val client = helper.loginClient
-
-            val vpnResponse = okOrThrow("VPN登陆页面打开失败") {
-                client.get(URL_VPN_LOGIN)
-            }
-
-            val tokenMap = VPNTokenParser.parse(vpnResponse.content.toByteArray().toString(Charsets.UTF_8))
-
-            val vpnLoginParameters = generateVPNLoginParameters(username, password, tokenMap)
-            val vpnLoginResponse = foundOrThrow("VPN登陆失败") {
-                client.submitForm(vpnLoginParameters) {
-                    url(URL_VPN_LOGIN)
+            recordMutex.withLock {
+                if (evaluationRecord.contains(username)) {
+                    throw AlreadyEvaluatingException(username)
                 }
             }
 
-            val location = vpnLoginResponse.headers["Location"]!!
-            val vpnKeyResponse = foundOrThrow("VPN Key获取失败") {
-                client.get(location)
-            }
-
-            helper.cookieStore.addAll(vpnKeyResponse.setCookie().filter { it.domain == ".ecit.cn" })
-
-            val eduResponse = okOrThrow("教务系统页面打开失败") {
-                client.get(URL_EDUCATIONAL_LOGIN)
-            }
-
-            val formMap = EduFormParser.parse(eduResponse.string())
-            val key = formMap.remove("key")!!
-            val eduLoginParameters = Parameters.build {
-                append("username", username)
-                append("password", AESUtils.encrypt(password, key))
-                formMap.forEach {
-                    append(it.key, it.value)
-                }
-            }
-            val eduLoginResponse = foundOrThrow("教务系统登陆失败") {
-                client.submitForm(eduLoginParameters) {
-                    url(URL_EDUCATIONAL_LOGIN)
-                }
-            }
-
-            var foundResponse = eduLoginResponse
-
-            foundResponse = client.get(foundResponse.headers["Location"]!!)
-            helper.cookieStore.addAll(foundResponse.setCookie())
-
-            /**
-            * 跳转到 Constants.URL_EDUCATIONAL_HOME 为止
-            * */
-            while (foundResponse.status == HttpStatusCode.Found) {
-                foundResponse = client.get(foundResponse.headers["Location"]!!)
-            }
-
-            helper.cookieStore.addAll(eduLoginResponse.setCookie())
-
-//            println(helper.getCookieStoreString())
-
-            return helper
+            return EvaluationHelper(username, password)
         }
 
         private inline fun okOrThrow(errorMsg: String, block: () -> HttpResponse): HttpResponse {

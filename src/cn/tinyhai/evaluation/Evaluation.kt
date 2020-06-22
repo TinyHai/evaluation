@@ -1,5 +1,6 @@
 package cn.tinyhai.evaluation
 
+import cn.tinyhai.exception.AlreadyEvaluatingException
 import cn.tinyhai.parse.EvaluationFormListParser
 import cn.tinyhai.parse.EvaluationResultParser
 import cn.tinyhai.parse.QuestionFormParser
@@ -19,18 +20,19 @@ import java.nio.charset.Charset
 @KtorExperimentalAPI
 object Evaluation {
 
-    suspend fun startEvaluation(username: String, password: String) = supervisorScope {
+    @Throws(AlreadyEvaluatingException::class)
+    suspend fun startEvaluation(username: String, password: String) = coroutineScope {
         val helper = EvaluationHelper.obtain(username, password)
-        val client = helper.evaluationClient
+
+        val client = helper.login()
 
         val evaluationListPage = getEvaluationListPage(client)
         val evaluationFormList = EvaluationFormListParser.parse(evaluationListPage)
+
         val questionFormList = getAllQuestionForm(evaluationFormList, client)
 
-        val evaluationList = ArrayList<Deferred<Boolean>>()
-
-        questionFormList.forEach { formMap ->
-            evaluationList += async(coroutineContext) {
+        val evaluationList = questionFormList.map { formMap ->
+            async {
                 if (formMap.isEmpty()) {
                     true
                 } else {
@@ -54,9 +56,8 @@ object Evaluation {
             }
         }
 
-        val evaluationResult = ArrayList<Boolean>()
-        evaluationList.forEach {
-            evaluationResult += try {
+        val evaluationResult = evaluationList.map {
+            try {
                 it.await()
             } catch (e: RuntimeException) {
                 e.printStackTrace()
