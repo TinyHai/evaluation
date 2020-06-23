@@ -4,8 +4,6 @@ import cn.tinyhai.evaluation.Evaluation
 import cn.tinyhai.exception.AlreadyEvaluatingException
 import io.ktor.application.Application
 import io.ktor.application.call
-import io.ktor.application.install
-import io.ktor.features.AutoHeadResponse
 import io.ktor.html.respondHtml
 import io.ktor.http.ContentType
 import io.ktor.http.content.*
@@ -24,12 +22,6 @@ fun main(args: Array<String>): Unit = io.ktor.server.tomcat.EngineMain.main(args
 @kotlin.jvm.JvmOverloads
 fun Application.module(testing: Boolean = false) {
 
-//    install(ContentNegotiation) {
-//        jackson {
-//            enable(SerializationFeature.INDENT_OUTPUT)
-//        }
-//    }
-
     routing {
         static("js") {
             resources("js")
@@ -39,6 +31,7 @@ fun Application.module(testing: Boolean = false) {
             call.respondRedirect("/evaluation")
             return@get
         }
+
         route("/evaluation") {
             get {
                 val error = call.parameters["error"]
@@ -64,17 +57,15 @@ fun Application.module(testing: Boolean = false) {
                             + "学号: "
                             textInput {
                                 name = "username"
-                                required = true
                             }
                             br
                             + "密码: "
                             passwordInput{
                                 name = "password"
-                                required = true
                             }
                             br
                             submitInput {
-                                onClick = "return beginEvaluation()"
+                                onClick = "beginEvaluation()"
                                 value = "开始评教"
                             }
                             resetInput {

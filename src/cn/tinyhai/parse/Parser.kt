@@ -1,5 +1,5 @@
 package cn.tinyhai.parse
 
-interface Parser <T> {
-    suspend fun parse(html: String): T
+interface Parser <R> {
+    suspend fun parse(html: String): R
 }

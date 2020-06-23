@@ -1,4 +1,5 @@
-var evaluating = false
+let evaluating = false;
+
 function beginEvaluation() {
     let $evaluationForm = $("#evaluationForm")
 
@@ -12,9 +13,10 @@ function beginEvaluation() {
             timeout: 10000,
             success: (data) => {
                 alert(data)
+            },
+            complete: () => {
                 evaluating = false
             }
         })
     }
-    return false;
 }
