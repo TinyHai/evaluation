@@ -34,7 +34,6 @@ fun Application.module(testing: Boolean = false) {
 
         route("/evaluation") {
             get {
-                val error = call.parameters["error"]
                 println("evaluation访问")
                 call.respondHtml {
                     head {
@@ -45,12 +44,6 @@ fun Application.module(testing: Boolean = false) {
                         }
                     }
                     body {
-                        if (error != null) {
-                            p {
-                                style = "color: red;"
-                                + error
-                            }
-                        }
                         div {
                             form("/evaluation", FormEncType.applicationXWwwFormUrlEncoded, FormMethod.post) {
                                 id = "evaluationForm"
