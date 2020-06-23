@@ -70,6 +70,10 @@ object Evaluation {
         evaluationResult
     }
 
+    suspend fun cancelWaitingRequest(username: String) {
+        EvaluationHelper.cancelWaitingRequest(username)
+    }
+
     private suspend fun getAllQuestionForm(evaluationFormList: List<Map<String, String>>, client: HttpClient): List<Map<String, String>> {
         val questionFormList = ArrayList<Map<String, String>>(evaluationFormList.size)
         evaluationFormList.forEach { formMap ->

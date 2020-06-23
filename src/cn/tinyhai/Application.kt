@@ -2,21 +2,20 @@ package cn.tinyhai
 
 import cn.tinyhai.evaluation.Evaluation
 import cn.tinyhai.exception.AlreadyEvaluatingException
-import io.ktor.application.*
-import io.ktor.client.engine.callContext
-import io.ktor.features.ForwardedHeaderSupport
-import io.ktor.features.XForwardedHeaderSupport
-import io.ktor.features.origin
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.application.Application
+import io.ktor.application.call
+import io.ktor.application.install
+import io.ktor.features.AutoHeadResponse
 import io.ktor.html.respondHtml
-import io.ktor.http.push
+import io.ktor.http.ContentType
+import io.ktor.http.content.*
 import io.ktor.request.receiveParameters
+import io.ktor.response.respondRedirect
+import io.ktor.response.respondText
+import io.ktor.routing.*
 import io.ktor.util.KtorExperimentalAPI
-import io.ktor.util.pipeline.PipelinePhase
 import kotlinx.coroutines.withContext
 import kotlinx.html.*
-import java.lang.RuntimeException
 
 fun main(args: Array<String>): Unit = io.ktor.server.tomcat.EngineMain.main(args)
 
@@ -31,9 +30,11 @@ fun Application.module(testing: Boolean = false) {
 //        }
 //    }
 
-//    install(ForwardedHeaderSupport)
-
     routing {
+        static("js") {
+            resources("js")
+        }
+
         get("/") {
             call.respondRedirect("/evaluation")
             return@get
@@ -45,6 +46,10 @@ fun Application.module(testing: Boolean = false) {
                 call.respondHtml {
                     head {
                         title("一键评教")
+                        script { src = "https://cdn.bootcss.com/jquery/3.4.1/jquery.js" }
+                        script(ScriptType.textJavaScript) {
+                            src = "/js/evaluation.js"
+                        }
                     }
                     body {
                         if (error != null) {
@@ -54,11 +59,22 @@ fun Application.module(testing: Boolean = false) {
                             }
                         }
                         form("/evaluation", FormEncType.applicationXWwwFormUrlEncoded, FormMethod.post) {
-                            + "学号: "; input(InputType.text, name = "username") { required = true }
+                            id = "evaluationForm"
+
+                            + "学号: "
+                            textInput {
+                                name = "username"
+                                required = true
+                            }
                             br
-                            + "密码: "; input(InputType.password, name = "password") { required = true }
+                            + "密码: "
+                            passwordInput{
+                                name = "password"
+                                required = true
+                            }
                             br
                             submitInput {
+                                onClick = "return beginEvaluation()"
                                 value = "开始评教"
                             }
                             resetInput {
@@ -92,12 +108,13 @@ fun Application.module(testing: Boolean = false) {
                             }
                         }.size
                     }
-                    call.respondText("总共可评教数：$all\n已评教：$successCount\n评教失败：$failCount")
+                    call.respondText("总共可评教数：$all\n已评教：$successCount\n评教失败：$failCount", ContentType.Text.Plain)
                 } catch (e: RuntimeException) {
                     e.printStackTrace()
                     call.respondText("评教出错：${e.message}")
                 } catch (e: AlreadyEvaluatingException) {
-                    println("用户${e.message}正在评教")
+                    e.printStackTrace()
+                    call.respondText(e.message!!, ContentType.Text.Plain)
                 }
             }
         }

@@ -16,11 +16,14 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.*
 import io.ktor.util.KtorExperimentalAPI
 import io.ktor.util.toByteArray
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.lang.Exception
 import java.lang.RuntimeException
 import java.nio.charset.Charset
+import kotlin.coroutines.coroutineContext
 
 @KtorExperimentalAPI
 class EvaluationHelper private constructor(
@@ -149,6 +152,8 @@ class EvaluationHelper private constructor(
 
         private val evaluationRecord = ArrayList<String>()
 
+        private val waitJobMap = HashMap<String, ArrayList<Job>>()
+
         private val recordMutex = Mutex()
 
         private fun generateLoginClient() =
@@ -191,6 +196,14 @@ class EvaluationHelper private constructor(
                 append("user[dymatice_code]", "unknown")
                 append("commit", "登录 Login")
             }
+
+        suspend fun cancelWaitingRequest(username: String) {
+            recordMutex.withLock {
+                waitJobMap[username]?.forEach {
+                    it.cancel()
+                }
+            }
+        }
 
         suspend fun obtain(username: String, password: String): EvaluationHelper {
             recordMutex.withLock {
