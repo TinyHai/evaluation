@@ -18,7 +18,8 @@ object EduFormParser : Parser<MutableMap<String, String>> {
         val body = document.body()
         val casLoginForm = body.select("form#casLoginForm")
         val inputs = casLoginForm.select("> input")
-        return mutableMapOf(*inputs.toList().map { it.attr("name") to it.`val`() }.toTypedArray(), "key" to key)
+
+        return mutableMapOf(*inputs.map { it.attr("name") to it.`val`() }.toTypedArray(), "key" to key)
     }
 
     private fun parseKey(js: String): String {

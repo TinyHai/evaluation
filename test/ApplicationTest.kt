@@ -2,8 +2,8 @@ package cn.tinyhai
 
 import cn.tinyhai.aes.AESUtils
 import cn.tinyhai.evaluation.EvaluationHelper
-import cn.tinyhai.parse.EvaluationFormListParser
-import cn.tinyhai.parse.QuestionFormParser
+import cn.tinyhai.parse.EvaluationParametersListParser
+import cn.tinyhai.parse.QuestionParametersParser
 import io.ktor.http.*
 import kotlin.test.*
 import io.ktor.server.testing.*
@@ -31,14 +31,14 @@ class ApplicationTest {
     @Test
     fun testQuestionParser() = runBlocking {
         val html = BufferedReader(FileReader("test/question.html")).use { it.readText() }
-        println(QuestionFormParser.parse(html))
+        println(QuestionParametersParser.parse(html))
         Unit
     }
 
     @Test
     fun testEvaluationFormListParser() = runBlocking {
         val html = BufferedReader(FileReader("test/list.html")).use { it.readText() }
-        println(EvaluationFormListParser.parse(html))
+        println(EvaluationParametersListParser.parse(html))
         Unit
     }
 

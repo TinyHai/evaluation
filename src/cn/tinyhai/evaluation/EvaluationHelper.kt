@@ -16,14 +16,11 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.*
 import io.ktor.util.KtorExperimentalAPI
 import io.ktor.util.toByteArray
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.lang.Exception
 import java.lang.RuntimeException
 import java.nio.charset.Charset
-import kotlin.coroutines.coroutineContext
 
 @KtorExperimentalAPI
 class EvaluationHelper private constructor(
@@ -52,10 +49,10 @@ class EvaluationHelper private constructor(
             client.get(URL_VPN_LOGIN)
         }
 
-        val tokenMap = VPNTokenParser.parse(vpnResponse.content.toByteArray().toString(Charsets.UTF_8))
+        val tokenPair = VPNTokenParser.parse(vpnResponse.content.toByteArray().toString(Charsets.UTF_8))
 
         // 登陆VPN
-        val vpnLoginParameters = generateVPNLoginParameters(username, password, tokenMap)
+        val vpnLoginParameters = generateVPNLoginParameters(username, password, tokenPair)
         val vpnLoginResponse = foundOrThrow("VPN登陆失败") {
             client.submitForm(vpnLoginParameters) {
                 url(URL_VPN_LOGIN)
@@ -152,8 +149,6 @@ class EvaluationHelper private constructor(
 
         private val evaluationRecord = ArrayList<String>()
 
-        private val waitJobMap = HashMap<String, ArrayList<Job>>()
-
         private val recordMutex = Mutex()
 
         private fun generateLoginClient() =
@@ -183,27 +178,17 @@ class EvaluationHelper private constructor(
             }
 
         private fun generateVPNLoginParameters(
-            username: String,
-            password: String,
-            tokenMap: Map<String, String>
+                username: String,
+                password: String,
+                tokenPair: Pair<String, String>
         ) = Parameters.build {
-                tokenMap.forEach {
-                    append(it.key, it.value)
-                }
+                append(tokenPair.first, tokenPair.second)
                 append("utf8", "✓")
                 append("user[login]", username)
                 append("user[password]", password)
                 append("user[dymatice_code]", "unknown")
                 append("commit", "登录 Login")
             }
-
-        suspend fun cancelWaitingRequest(username: String) {
-            recordMutex.withLock {
-                waitJobMap[username]?.forEach {
-                    it.cancel()
-                }
-            }
-        }
 
         suspend fun obtain(username: String, password: String): EvaluationHelper {
             recordMutex.withLock {

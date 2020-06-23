@@ -1,9 +1,9 @@
 package cn.tinyhai.evaluation
 
 import cn.tinyhai.exception.AlreadyEvaluatingException
-import cn.tinyhai.parse.EvaluationFormListParser
+import cn.tinyhai.parse.EvaluationParametersListParser
 import cn.tinyhai.parse.EvaluationResultParser
-import cn.tinyhai.parse.QuestionFormParser
+import cn.tinyhai.parse.QuestionParametersParser
 import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -27,23 +27,19 @@ object Evaluation {
         val client = helper.login()
 
         val evaluationListPage = getEvaluationListPage(client)
-        val evaluationFormList = EvaluationFormListParser.parse(evaluationListPage)
+        val evaluationParametersList = EvaluationParametersListParser.parse(evaluationListPage)
 
-        val questionFormList = getAllQuestionForm(evaluationFormList, client)
+        val questionParametersList = getAllQuestionParameters(evaluationParametersList, client)
 
-        val evaluationList = questionFormList.map { formMap ->
+        val evaluationDeferredList = questionParametersList.map { parameters ->
             async {
-                if (formMap.isEmpty()) {
+                if (parameters.isEmpty()) {
                     true
                 } else {
-                    val parameters = Parameters.build {
-                        formMap.forEach {
-                            append(it.key, it.value)
-                        }
-                    }
                     val evaluateResponse = client.submitForm<HttpResponse>(parameters) {
                         url(URL_EDUCATIONAL_EVALUATE)
                     }
+                    println(parameters.formUrlEncode())
                     val html = evaluateResponse.charset()?.let { evaluateResponse.string(it) } ?: evaluateResponse.string()
                     if (evaluateResponse.status == HttpStatusCode.OK) {
                         EvaluationResultParser.parse(html)
@@ -56,7 +52,7 @@ object Evaluation {
             }
         }
 
-        val evaluationResult = evaluationList.map {
+        val evaluationResult = evaluationDeferredList.map {
             try {
                 it.await()
             } catch (e: RuntimeException) {
@@ -70,30 +66,20 @@ object Evaluation {
         evaluationResult
     }
 
-    suspend fun cancelWaitingRequest(username: String) {
-        EvaluationHelper.cancelWaitingRequest(username)
-    }
-
-    private suspend fun getAllQuestionForm(evaluationFormList: List<Map<String, String>>, client: HttpClient): List<Map<String, String>> {
-        val questionFormList = ArrayList<Map<String, String>>(evaluationFormList.size)
-        evaluationFormList.forEach { formMap ->
-            questionFormList += if (formMap.isEmpty()) {
-                formMap
+    private suspend fun getAllQuestionParameters(evaluationParametersList: List<Parameters>, client: HttpClient): List<Parameters> {
+        val questionParametersList = ArrayList<Parameters>(evaluationParametersList.size)
+        evaluationParametersList.forEach { parameters ->
+            questionParametersList += if (parameters.isEmpty()) {
+                parameters
             } else {
-                val parameters = Parameters.build {
-                    formMap.forEach {
-                        append(it.key, it.value)
-                    }
-                }
-
                 val response = client.submitForm<HttpResponse>(parameters) {
                     url(URL_EDUCATIONAL_QUESTION)
                 }
                 val html = response.charset()?.let { response.string(it) } ?: response.string()
-                QuestionFormParser.parse(html)
+                QuestionParametersParser.parse(html)
             }
         }
-        return questionFormList
+        return questionParametersList
     }
 
     private suspend fun getEvaluationListPage(client: HttpClient): String {

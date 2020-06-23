@@ -2,9 +2,9 @@ package cn.tinyhai.parse
 
 import org.jsoup.Jsoup
 
-object VPNTokenParser : Parser<Map<String, String>> {
+object VPNTokenParser : Parser<Pair<String, String>> {
 
-    override suspend fun parse(html: String): Map<String, String> {
+    override suspend fun parse(html: String): Pair<String, String> {
         val document = Jsoup.parse(html)
 
         println("开始解析VPN Token")
@@ -14,6 +14,6 @@ object VPNTokenParser : Parser<Map<String, String>> {
         val tokenMeta = head.select("meta[name=csrf-token]")
         val token = tokenMeta.attr("content")
 
-        return mapOf("authenticity_token" to token)
+        return "authenticity_token" to token
     }
 }
