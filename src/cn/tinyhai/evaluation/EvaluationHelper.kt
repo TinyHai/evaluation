@@ -118,8 +118,9 @@ class EvaluationHelper private constructor(
                 throw RuntimeException("VPN登出失败")
             }
             println(cookies.map { it.name to it.value })
+        } else {
+            throw RuntimeException("VPN未登陆，不需要登出")
         }
-        throw RuntimeException("VPN未登陆，不需要登出")
     }
 
     suspend fun dispose() {
@@ -195,6 +196,8 @@ class EvaluationHelper private constructor(
             recordMutex.withLock {
                 if (evaluationRecord.contains(username)) {
                     throw AlreadyEvaluatingException(username)
+                } else {
+                    evaluationRecord.add(username)
                 }
             }
 
