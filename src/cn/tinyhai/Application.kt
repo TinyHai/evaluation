@@ -51,25 +51,34 @@ fun Application.module(testing: Boolean = false) {
                                 + error
                             }
                         }
-                        form("/evaluation", FormEncType.applicationXWwwFormUrlEncoded, FormMethod.post) {
-                            id = "evaluationForm"
+                        div {
+                            form("/evaluation", FormEncType.applicationXWwwFormUrlEncoded, FormMethod.post) {
+                                id = "evaluationForm"
 
-                            + "学号: "
-                            textInput {
-                                name = "username"
+                                + "学号: "
+                                textInput {
+                                    name = "username"
+                                }
+                                br
+                                + "密码: "
+                                passwordInput{
+                                    name = "password"
+                                }
+                                br
+                                submitInput {
+                                    onClick = "return beginEvaluation()"
+                                    value = "开始评教"
+                                }
+                                resetInput {
+                                    value = "重置"
+                                }
                             }
-                            br
-                            + "密码: "
-                            passwordInput{
-                                name = "password"
-                            }
-                            br
-                            submitInput {
-                                onClick = "return beginEvaluation()"
-                                value = "开始评教"
-                            }
-                            resetInput {
-                                value = "重置"
+                        }
+                        div {
+                            a {
+                                href = "https://github.com/TinyHai/evaluation"
+                                target = "_blank"
+                                + "Github开源地址"
                             }
                         }
                     }
