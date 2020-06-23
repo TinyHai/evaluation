@@ -117,7 +117,6 @@ class EvaluationHelper private constructor(
             if (cookies.isEmpty()) {
                 throw RuntimeException("VPN登出失败")
             }
-            println(cookies.map { it.name to it.value })
         } else {
             throw RuntimeException("VPN未登陆，不需要登出")
         }

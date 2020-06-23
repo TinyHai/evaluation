@@ -39,7 +39,6 @@ object Evaluation {
                     val evaluateResponse = client.submitForm<HttpResponse>(parameters) {
                         url(URL_EDUCATIONAL_EVALUATE)
                     }
-                    println(parameters.formUrlEncode())
                     val html = evaluateResponse.charset()?.let { evaluateResponse.string(it) } ?: evaluateResponse.string()
                     if (evaluateResponse.status == HttpStatusCode.OK) {
                         EvaluationResultParser.parse(html)

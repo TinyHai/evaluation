@@ -65,7 +65,7 @@ fun Application.module(testing: Boolean = false) {
                             }
                             br
                             submitInput {
-                                onClick = "beginEvaluation()"
+                                onClick = "return beginEvaluation()"
                                 value = "开始评教"
                             }
                             resetInput {
