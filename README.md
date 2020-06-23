@@ -3,6 +3,8 @@
 ECIT 网上评教模拟  
 评教所有问卷题目全选优秀
 
+评教测试页面: [http://api.tinyhai.cn/](http://api.tinyhai.cn/)
+
 Html解析: [Jsoup](https://github.com/jhy/jsoup)  
 Http服务端: [Ktor-Server](https://github.com/ktorio/ktor/tree/master/ktor-server)  
 Http客户端: [Ktor-Client](https://github.com/ktorio/ktor/tree/master/ktor-client)  
