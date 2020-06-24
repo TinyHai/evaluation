@@ -12,7 +12,12 @@ object EvaluationParametersListParser : Parser<List<Parameters>> {
         println("开始解析评估列表")
         println("页面标题：" + document.title())
 
-        val trs = document.select("table#user tbody > tr")
+        val userTable = document.select("table#user").first()
+        val trs = userTable.select("table#user tbody > tr")
+
+        if (trs.isEmpty()) {
+            throw RuntimeException(userTable.parent().ownText())
+        }
 
         val resultList = ArrayList<Parameters>()
         for (tr in trs) {

@@ -2,6 +2,7 @@ package cn.tinyhai
 
 import cn.tinyhai.evaluation.Evaluation
 import cn.tinyhai.exception.AlreadyEvaluatingException
+import cn.tinyhai.exception.EvaluationException
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.html.respondHtml
@@ -102,12 +103,12 @@ fun Application.module(testing: Boolean = false) {
                         }.size
                     }
                     call.respondText("总共可评教数：$all\n已评教：$successCount\n评教失败：$failCount", ContentType.Text.Plain)
-                } catch (e: RuntimeException) {
+                } catch (e: EvaluationException) {
+                    e.printStackTrace()
+                    call.respondText(e.reason, ContentType.Text.Plain)
+                } catch (e: Exception) {
                     e.printStackTrace()
                     call.respondText("评教出错：${e.message}")
-                } catch (e: AlreadyEvaluatingException) {
-                    e.printStackTrace()
-                    call.respondText(e.message!!, ContentType.Text.Plain)
                 }
             }
         }

@@ -1,3 +1,4 @@
 package cn.tinyhai.exception
 
-class AlreadyEvaluatingException(username: String) : Exception(username)
+class AlreadyEvaluatingException(username: String)
+    : EvaluationException("${username}正在评教中")

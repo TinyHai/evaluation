@@ -18,7 +18,7 @@ object EvaluationResultParser : Parser<Boolean> {
 
         if (matcher.find()) {
             val resultMsg = matcher.group(1)
-            return resultMsg.contains("成功")
+            return resultMsg.contains("失败").not()
         }
 
         println("未匹配到评估返回结果！")
